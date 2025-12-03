@@ -1,0 +1,172 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  username  String   @unique
+  name      String
+  password  String
+  xp        Int      @default(0)
+  level     Int      @default(1)
+  theme     String?  @default("system") // light, dark, system
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  codeRuns      CodeRun[]
+  progress      Progress[]
+  bookmarks     Bookmark[]
+  achievements  UserAchievement[]
+}
+
+model Concept {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String   @unique
+  description String?
+  content     String?  // Markdown content
+  difficulty  String?  // beginner, intermediate, advanced
+  order       Int      @default(0)
+  parentId   String?
+  parent     Concept? @relation("ConceptHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Concept[] @relation("ConceptHierarchy")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  articles      Article[]
+  visualizations Visualization[]
+  faqs          FAQ[]
+  practiceProblems PracticeProblem[]
+  progress      Progress[]
+  bookmarks     Bookmark[]
+}
+
+model Article {
+  id        String   @id @default(uuid())
+  conceptId String
+  concept   Concept  @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  markdown  String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([conceptId])
+}
+
+model Visualization {
+  id        String   @id @default(uuid())
+  conceptId String
+  concept   Concept  @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  type      String   // array, tree, stack, queue, graph
+  config    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FAQ {
+  id        String   @id @default(uuid())
+  conceptId String?
+  concept   Concept? @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  question  String
+  answer    String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PracticeProblem {
+  id          String   @id @default(uuid())
+  conceptId   String
+  concept     Concept  @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  title       String
+  description String   @db.Text
+  difficulty  String   // easy, medium, hard
+  examples    Json     // Array of {input, output}
+  hints       Json     // Array of strings
+  solution    String?  @db.Text
+  testCases   Json     // Array of {input, expectedOutput}
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CodeRun {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code         String   @db.Text
+  language     String   // python, cpp, javascript
+  input        String?
+  output       String?  @db.Text
+  error        String?  @db.Text
+  traceJson    Json?
+  executionTime Int?
+  conceptId    String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Progress {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conceptId  String
+  concept    Concept  @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  status     String   // not_started, in_progress, completed
+  xpEarned   Int      @default(0)
+  completedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, conceptId])
+  @@index([userId])
+}
+
+model Bookmark {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conceptId String
+  concept   Concept  @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, conceptId])
+  @@index([userId])
+}
+
+model Achievement {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String
+  icon        String
+  category    String   // code, learning, visualization, milestone
+  xpReward    Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  userAchievements UserAchievement[]
+}
+
+model UserAchievement {
+  id            String     @id @default(uuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  earnedAt      DateTime   @default(now())
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+}
+
