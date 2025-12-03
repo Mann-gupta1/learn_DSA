@@ -18,6 +18,7 @@ This platform provides an interactive learning environment for mastering Data St
   - Built with React Three Fiber for 3D visualizations
   - D3.js and Recharts for data visualization
 - **FAQs**: Frequently asked questions for each concept
+- **AI Chatbot**: Intelligent floating chatbot that answers questions about concepts, app features, and can fetch context from URLs
 
 ### User Features
 - **User Authentication**: Secure registration and login with JWT tokens
@@ -46,6 +47,7 @@ This platform provides an interactive learning environment for mastering Data St
 - **Database**: PostgreSQL with Prisma ORM
 - **Authentication**: JWT (JSON Web Tokens) with bcryptjs
 - **Code Execution**: Child process execution with timeout and security controls
+- **URL Fetching**: Extract and process content from web pages for context-aware responses
 
 ### Frontend
 - **Framework**: React 19 with TypeScript
@@ -191,6 +193,9 @@ This platform provides an interactive learning environment for mastering Data St
 ### FAQs
 - `GET /api/faqs` - Get all FAQs
 - `GET /api/faqs/:conceptId` - Get FAQs for a concept
+
+### Chatbot
+- `POST /api/chatbot/chat` - Chat with AI assistant (supports concept context and URL fetching)
 
 ## 🗄️ Database Schema
 

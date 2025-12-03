@@ -209,6 +209,24 @@ class ApiService {
   async getUserAchievements() {
     return this.request<{ achievements: unknown[]; earnedAchievements: string[] }>('/achievements');
   }
+
+  // Chatbot
+  async chat(data: {
+    question: string;
+    conceptId?: string;
+    url?: string;
+    conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  }) {
+    return this.request<{
+      response: string;
+      contextUsed: string;
+      hasContext: boolean;
+      conceptId: string | null;
+    }>('/chatbot/chat', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export const apiService = new ApiService();

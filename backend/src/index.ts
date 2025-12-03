@@ -31,6 +31,7 @@ import leaderboardRoutes from './routes/leaderboardRoutes';
 import visualizationRoutes from './routes/visualizationRoutes';
 import bookmarkRoutes from './routes/bookmarkRoutes';
 import achievementRoutes from './routes/achievementRoutes';
+import chatbotRoutes from './routes/chatbotRoutes';
 
 // Basic route
 app.get('/api/health', (req, res) => {
@@ -49,6 +50,7 @@ app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/visualizations', visualizationRoutes);
 app.use('/api/bookmarks', bookmarkRoutes);
 app.use('/api/achievements', achievementRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

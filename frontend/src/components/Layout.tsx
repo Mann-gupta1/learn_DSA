@@ -9,6 +9,7 @@ import { formatXP } from '../utils/formatters';
 import ThemeToggle from './ThemeToggle';
 import SearchBar from './SearchBar';
 import SideNav from './SideNav';
+import FloatingAskAI from './FloatingAskAI';
 import { apiService } from '../services/api';
 import { FaHome, FaBook, FaCode, FaEye, FaUser, FaSignInAlt, FaBars, FaChartLine, FaChevronDown, FaChevronRight, FaCheckCircle, FaSignOutAlt, FaTrophy, FaHistory, FaCog } from 'react-icons/fa';
 import type { Concept } from '../types';
@@ -332,6 +333,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <main className="flex-1 pt-6 pb-8">{children}</main>
+
+      {/* Floating AI Chatbot */}
+      <FloatingAskAI />
 
       {/* Footer with Glassmorphism */}
       <footer className="glass-card border-t border-white/20 dark:border-gray-700/30 mt-auto">
