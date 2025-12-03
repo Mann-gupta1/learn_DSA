@@ -8,6 +8,11 @@ import GraphVisualizer from '../visualizations/GraphVisualizer';
 export default function VisualizationShowcase() {
   const [selectedType, setSelectedType] = useState<'array' | 'tree' | 'stack' | 'queue' | 'graph'>('array');
   const [arrayData, setArrayData] = useState([64, 34, 25, 12, 22, 11, 90]);
+  const [algorithmType, setAlgorithmType] = useState<'sort' | 'search'>('sort');
+  const [searchTarget, setSearchTarget] = useState<number>(25);
+  const [highlighted, setHighlighted] = useState<number[]>([]);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [searchResult, setSearchResult] = useState<{ found: boolean; index?: number; message: string } | null>(null);
 
   return (
     <div className="min-h-screen">
@@ -85,16 +90,173 @@ export default function VisualizationShowcase() {
         {/* Render Selected Visualization */}
         <div className="mb-6">
           {selectedType === 'array' && (
-            <ArrayVisualizer
-              data={arrayData}
-              onDataChange={setArrayData}
-              showControls={true}
+            <>
+              <div className="mb-4 flex flex-wrap gap-4 items-center">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setAlgorithmType('sort')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      algorithmType === 'sort'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    Sorting
+                  </button>
+                  <button
+                    onClick={() => setAlgorithmType('search')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      algorithmType === 'search'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    Searching
+                  </button>
+                </div>
+                
+                {algorithmType === 'search' && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Target:</label>
+                      <input
+                        type="number"
+                        value={searchTarget}
+                        onChange={(e) => setSearchTarget(Number(e.target.value))}
+                        className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                        disabled={isAnimating}
+                      />
+                    </div>
+                    <button
+                      onClick={async () => {
+                        setIsAnimating(true);
+                        setHighlighted([]);
+                        setSearchResult(null);
+                        let found = false;
+                        let foundIndex = -1;
+                        
+                        for (let i = 0; i < arrayData.length; i++) {
+                          setHighlighted([i]);
+                          await new Promise((resolve) => setTimeout(resolve, 500));
+                          if (arrayData[i] === searchTarget) {
+                            found = true;
+                            foundIndex = i;
+                            setHighlighted([i]);
+                            await new Promise((resolve) => setTimeout(resolve, 1000));
+                            break;
+                          }
+                        }
+                        
+                        setSearchResult({
+                          found,
+                          index: foundIndex,
+                          message: found 
+                            ? `✅ Found ${searchTarget} at index ${foundIndex}!` 
+                            : `❌ ${searchTarget} not found in the array.`
+                        });
+                        setIsAnimating(false);
+                      }}
+                      disabled={isAnimating}
+                      className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                    >
+                      {isAnimating ? 'Animating...' : '▶ Linear Search'}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setIsAnimating(true);
+                        const sortedArr = [...arrayData].sort((a, b) => a - b);
+                        setArrayData(sortedArr);
+                        setHighlighted([]);
+                        setSearchResult(null);
+                        let left = 0;
+                        let right = sortedArr.length - 1;
+                        let found = false;
+                        let foundIndex = -1;
+                        
+                        while (left <= right) {
+                          const mid = Math.floor((left + right) / 2);
+                          setHighlighted([left, mid, right]);
+                          await new Promise((resolve) => setTimeout(resolve, 500));
+                          if (sortedArr[mid] === searchTarget) {
+                            found = true;
+                            foundIndex = mid;
+                            setHighlighted([mid]);
+                            await new Promise((resolve) => setTimeout(resolve, 1000));
+                            break;
+                          } else if (sortedArr[mid] < searchTarget) {
+                            left = mid + 1;
+                          } else {
+                            right = mid - 1;
+                          }
+                        }
+                        
+                        setSearchResult({
+                          found,
+                          index: foundIndex,
+                          message: found 
+                            ? `✅ Found ${searchTarget} at index ${foundIndex}!` 
+                            : `❌ ${searchTarget} not found in the sorted array.`
+                        });
+                        setIsAnimating(false);
+                      }}
+                      disabled={isAnimating}
+                      className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                    >
+                      {isAnimating ? 'Animating...' : '▶ Binary Search'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setArrayData([64, 34, 25, 12, 22, 11, 90]);
+                        setHighlighted([]);
+                        setSearchTarget(25);
+                        setSearchResult(null);
+                      }}
+                      disabled={isAnimating}
+                      className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
+                    >
+                      Reset
+                    </button>
+                  </>
+                )}
+              </div>
+              {searchResult && (
+                <div className={`mb-4 p-4 rounded-lg ${
+                  searchResult.found 
+                    ? 'bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700' 
+                    : 'bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700'
+                }`}>
+                  <p className={`font-semibold ${
+                    searchResult.found 
+                      ? 'text-green-800 dark:text-green-200' 
+                      : 'text-red-800 dark:text-red-200'
+                  }`}>
+                    {searchResult.message}
+                  </p>
+                </div>
+              )}
+              <ArrayVisualizer
+                data={arrayData}
+                onDataChange={setArrayData}
+                showControls={algorithmType === 'sort'}
+                highlightIndices={highlighted}
+                enableStepControl={algorithmType === 'search'}
+              />
+            </>
+          )}
+          {selectedType === 'tree' && (
+            <TreeVisualizer 
+              showDelete={true}
+              showSearch={true}
             />
           )}
-          {selectedType === 'tree' && <TreeVisualizer />}
           {selectedType === 'stack' && <StackQueueVisualizer type="stack" />}
           {selectedType === 'queue' && <StackQueueVisualizer type="queue" />}
-          {selectedType === 'graph' && <GraphVisualizer />}
+          {selectedType === 'graph' && (
+            <GraphVisualizer 
+              showDelete={true}
+              showSearch={true}
+            />
+          )}
         </div>
 
         {/* Info Section */}

@@ -11,6 +11,8 @@ export default function VisualizationPage() {
   const [highlighted, setHighlighted] = useState<number[]>([]);
   const [isAnimating, setIsAnimating] = useState(false);
   const [vizType, setVizType] = useState<'array' | 'tree' | 'stack' | 'queue' | 'graph'>('array');
+  const [algorithmType, setAlgorithmType] = useState<'sort' | 'search'>('sort');
+  const [searchTarget, setSearchTarget] = useState<number>(25);
 
   // Example: Animate bubble sort
   const animateBubbleSort = async () => {
@@ -48,6 +50,54 @@ export default function VisualizationPage() {
     }
 
     setHighlighted([]);
+    setIsAnimating(false);
+  };
+
+  // Animate linear search
+  const animateLinearSearch = async () => {
+    setIsAnimating(true);
+    const target = searchTarget;
+    setHighlighted([]);
+
+    for (let i = 0; i < arrayData.length; i++) {
+      setHighlighted([i]);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      
+      if (arrayData[i] === target) {
+        setHighlighted([i]);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        break;
+      }
+    }
+
+    setIsAnimating(false);
+  };
+
+  // Animate binary search
+  const animateBinarySearch = async () => {
+    setIsAnimating(true);
+    const sortedArr = [...arrayData].sort((a, b) => a - b);
+    setArrayData(sortedArr);
+    const target = searchTarget;
+    let left = 0;
+    let right = sortedArr.length - 1;
+
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      setHighlighted([left, mid, right]);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      if (sortedArr[mid] === target) {
+        setHighlighted([mid]);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        break;
+      } else if (sortedArr[mid] < target) {
+        left = mid + 1;
+      } else {
+        right = mid - 1;
+      }
+    }
+
     setIsAnimating(false);
   };
 
@@ -91,16 +141,75 @@ export default function VisualizationPage() {
         <div className="mb-6">
           {vizType === 'array' && (
             <>
-              <div className="mb-4">
+              <div className="mb-4 flex flex-wrap gap-4 items-center">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setAlgorithmType('sort')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      algorithmType === 'sort'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    Sorting
+                  </button>
+                  <button
+                    onClick={() => setAlgorithmType('search')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      algorithmType === 'search'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    Searching
+                  </button>
+                </div>
+                
+                {algorithmType === 'sort' ? (
+                  <>
+                    <button
+                      onClick={animateBubbleSort}
+                      disabled={isAnimating}
+                      className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                    >
+                      {isAnimating ? 'Animating...' : '▶ Animate Bubble Sort'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium">Target:</label>
+                      <input
+                        type="number"
+                        value={searchTarget}
+                        onChange={(e) => setSearchTarget(Number(e.target.value))}
+                        className="w-20 px-2 py-1 border border-gray-300 rounded"
+                        disabled={isAnimating}
+                      />
+                    </div>
+                    <button
+                      onClick={animateLinearSearch}
+                      disabled={isAnimating}
+                      className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                    >
+                      {isAnimating ? 'Animating...' : '▶ Linear Search'}
+                    </button>
+                    <button
+                      onClick={animateBinarySearch}
+                      disabled={isAnimating}
+                      className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                    >
+                      {isAnimating ? 'Animating...' : '▶ Binary Search'}
+                    </button>
+                  </>
+                )}
+                
                 <button
-                  onClick={animateBubbleSort}
-                  disabled={isAnimating}
-                  className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 mr-4"
-                >
-                  {isAnimating ? 'Animating...' : '▶ Animate Bubble Sort'}
-                </button>
-                <button
-                  onClick={() => setArrayData([64, 34, 25, 12, 22, 11, 90])}
+                  onClick={() => {
+                    setArrayData([64, 34, 25, 12, 22, 11, 90]);
+                    setHighlighted([]);
+                    setSearchTarget(25);
+                  }}
                   disabled={isAnimating}
                   className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
                 >

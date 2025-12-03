@@ -318,8 +318,14 @@ export default function AlgorithmVisualizer({
     const title = conceptTitle.toLowerCase();
     let algorithmSteps: AlgorithmStep[] = [];
 
+    // Searching algorithms
+    if (slug.includes('linear-search') || slug.includes('sequential-search') || (title.includes('linear') && title.includes('search'))) {
+      algorithmSteps = generateLinearSearchSteps([...initialData]);
+    } else if (slug.includes('binary-search') || (title.includes('binary') && title.includes('search'))) {
+      algorithmSteps = generateBinarySearchSteps([...initialData]);
+    }
     // Sorting algorithms
-    if (slug.includes('bubble-sort') || title.includes('bubble')) {
+    else if (slug.includes('bubble-sort') || title.includes('bubble')) {
       algorithmSteps = generateBubbleSortSteps([...initialData]);
     } else if (slug.includes('selection-sort') || title.includes('selection')) {
       algorithmSteps = generateSelectionSortSteps([...initialData]);
@@ -368,6 +374,167 @@ export default function AlgorithmVisualizer({
     }
 
     return algorithmSteps;
+  };
+
+  // ========== SEARCHING ALGORITHMS ==========
+  const generateLinearSearchSteps = (arr: number[]): AlgorithmStep[] => {
+    const steps: AlgorithmStep[] = [];
+    const target = arr[Math.floor(arr.length / 2)]; // Use middle element as target for demo
+    
+    steps.push({
+      type: 'array',
+      data: [...arr],
+      indices: [],
+      action: 'init',
+      description: `🚀 Starting Linear Search: Looking for value ${target}`,
+    });
+
+    let found = false;
+    let foundIndex = -1;
+
+    for (let i = 0; i < arr.length; i++) {
+      steps.push({
+        type: 'array',
+        data: [...arr],
+        indices: [i],
+        action: 'compare',
+        description: `🔍 Checking index ${i}: arr[${i}] = ${arr[i]}`,
+        comparison: { left: arr[i], right: target, result: arr[i] === target },
+      });
+
+      if (arr[i] === target) {
+        found = true;
+        foundIndex = i;
+        steps.push({
+          type: 'array',
+          data: [...arr],
+          indices: [i],
+          action: 'found',
+          description: `✅ Found! Value ${target} is at index ${i}`,
+        });
+        break;
+      } else {
+        steps.push({
+          type: 'array',
+          data: [...arr],
+          indices: [i],
+          action: 'notmatch',
+          description: `❌ ${arr[i]} ≠ ${target}, continuing search...`,
+        });
+      }
+    }
+
+    if (!found) {
+      steps.push({
+        type: 'array',
+        data: [...arr],
+        indices: [],
+        action: 'notfound',
+        description: `❌ Value ${target} not found in array`,
+      });
+    } else {
+      steps.push({
+        type: 'array',
+        data: [...arr],
+        indices: [foundIndex],
+        action: 'complete',
+        description: `🎉 Search complete! Found ${target} at index ${foundIndex}`,
+      });
+    }
+
+    return steps;
+  };
+
+  const generateBinarySearchSteps = (arr: number[]): AlgorithmStep[] => {
+    const steps: AlgorithmStep[] = [];
+    // Sort array first for binary search
+    const sortedArr = [...arr].sort((a, b) => a - b);
+    const target = sortedArr[Math.floor(sortedArr.length / 2)]; // Use middle element as target
+    
+    steps.push({
+      type: 'array',
+      data: [...sortedArr],
+      indices: [],
+      action: 'init',
+      description: `🚀 Starting Binary Search: Looking for value ${target} in sorted array [${sortedArr.join(', ')}]`,
+    });
+
+    let left = 0;
+    let right = sortedArr.length - 1;
+    let found = false;
+    let foundIndex = -1;
+
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      
+      steps.push({
+        type: 'array',
+        data: [...sortedArr],
+        indices: [left, mid, right],
+        action: 'range',
+        description: `📊 Search range: [${left}...${right}], checking middle index ${mid}`,
+      });
+
+      steps.push({
+        type: 'array',
+        data: [...sortedArr],
+        indices: [mid],
+        action: 'compare',
+        description: `🔍 Comparing arr[${mid}] = ${sortedArr[mid]} with target ${target}`,
+        comparison: { left: sortedArr[mid], right: target, result: sortedArr[mid] === target },
+      });
+
+      if (sortedArr[mid] === target) {
+        found = true;
+        foundIndex = mid;
+        steps.push({
+          type: 'array',
+          data: [...sortedArr],
+          indices: [mid],
+          action: 'found',
+          description: `✅ Found! Value ${target} is at index ${mid}`,
+        });
+        break;
+      } else if (sortedArr[mid] < target) {
+        steps.push({
+          type: 'array',
+          data: [...sortedArr],
+          indices: [mid],
+          action: 'right',
+          description: `➡️ ${sortedArr[mid]} < ${target}, searching right half [${mid + 1}...${right}]`,
+        });
+        left = mid + 1;
+      } else {
+        steps.push({
+          type: 'array',
+          data: [...sortedArr],
+          indices: [mid],
+          action: 'left',
+          description: `⬅️ ${sortedArr[mid]} > ${target}, searching left half [${left}...${mid - 1}]`,
+        });
+        right = mid - 1;
+      }
+    }
+
+    if (!found) {
+      steps.push({
+        type: 'array',
+        data: [...sortedArr],
+        indices: [],
+        action: 'notfound',
+        description: `❌ Value ${target} not found in array`,
+      });
+    } else {
+      steps.push({
+        type: 'array',
+        data: [...sortedArr],
+        indices: [foundIndex],
+        action: 'complete',
+        description: `🎉 Search complete! Found ${target} at index ${foundIndex}`,
+      });
+    }
+
+    return steps;
   };
 
   // ========== SORTING ALGORITHMS ==========

@@ -17,12 +17,16 @@ interface GraphVisualizerProps {
   onNodeClick?: (nodeId: string) => void;
   highlightNodes?: string[];
   highlightEdges?: Array<{ source: string; target: string }>;
+  showDelete?: boolean;
+  showSearch?: boolean;
 }
 
 export default function GraphVisualizer({
   onNodeClick,
   highlightNodes = [],
   highlightEdges = [],
+  showDelete = false,
+  showSearch = false,
 }: GraphVisualizerProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [nodes, setNodes] = useState<GraphNode[]>([
@@ -43,6 +47,14 @@ export default function GraphVisualizer({
   ]);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [operation, setOperation] = useState<'add' | 'delete' | 'search' | 'traverse'>('add');
+  const [algorithm, setAlgorithm] = useState<'bfs' | 'dfs'>('bfs');
+  const [inputValue, setInputValue] = useState<string>('');
+  const [searchResult, setSearchResult] = useState<{ found: boolean; path: string[]; message: string } | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [internalHighlightNodes, setInternalHighlightNodes] = useState<string[]>([]);
+  const [operationResult, setOperationResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [highlightEdgesForDelete, setHighlightEdgesForDelete] = useState<Array<{ source: string; target: string }>>([]);
 
   useEffect(() => {
     if (!svgRef.current) return;
@@ -138,6 +150,11 @@ export default function GraphVisualizer({
           (e.source === edge.source && e.target === edge.target) ||
           (e.source === edge.target && e.target === edge.source)
       );
+      const isDeleteHighlight = highlightEdgesForDelete.some(
+        (e) =>
+          (e.source === edge.source && e.target === edge.target) ||
+          (e.source === edge.target && e.target === edge.source)
+      );
 
       svg
         .append('line')
@@ -146,9 +163,9 @@ export default function GraphVisualizer({
         .attr('y1', sourceNode.y)
         .attr('x2', targetNode.x)
         .attr('y2', targetNode.y)
-        .attr('stroke', isHighlighted ? '#ef4444' : '#6366f1')
-        .attr('stroke-width', isHighlighted ? 3.5 : 2.5)
-        .attr('opacity', isHighlighted ? 1 : 0.6)
+        .attr('stroke', isDeleteHighlight ? '#dc2626' : isHighlighted ? '#ef4444' : '#6366f1')
+        .attr('stroke-width', isDeleteHighlight ? 4 : isHighlighted ? 3.5 : 2.5)
+        .attr('opacity', isDeleteHighlight ? 1 : isHighlighted ? 1 : 0.6)
         .attr('stroke-linecap', 'round')
         .attr('marker-end', 'url(#arrowhead)');
     });
@@ -200,22 +217,38 @@ export default function GraphVisualizer({
     nodeGroups
       .append('circle')
       .attr('r', 28)
-      .attr('fill', (d) =>
-        highlightNodes.includes(d.id)
+      .attr('fill', (d) => {
+        const isHighlighted = highlightNodes.length > 0 
+          ? highlightNodes.includes(d.id)
+          : internalHighlightNodes.includes(d.id);
+        return isHighlighted
           ? 'url(#highlightGradient)'
           : selectedNode === d.id
           ? 'url(#selectedGradient)'
-          : 'url(#nodeGradient)'
-      )
-      .attr('stroke', (d) =>
-        highlightNodes.includes(d.id)
+          : 'url(#nodeGradient)';
+      })
+      .attr('stroke', (d) => {
+        const isHighlighted = highlightNodes.length > 0 
+          ? highlightNodes.includes(d.id)
+          : internalHighlightNodes.includes(d.id);
+        return isHighlighted
           ? '#ef4444'
           : selectedNode === d.id
           ? '#f59e0b'
-          : '#6366f1'
-      )
-      .attr('stroke-width', highlightNodes.includes(d.id) || selectedNode === d.id ? 3 : 2.5)
-      .attr('filter', highlightNodes.includes(d.id) || selectedNode === d.id ? 'url(#glow)' : 'none');
+          : '#6366f1';
+      })
+      .attr('stroke-width', (d) => {
+        const isHighlighted = highlightNodes.length > 0 
+          ? highlightNodes.includes(d.id)
+          : internalHighlightNodes.includes(d.id);
+        return isHighlighted || selectedNode === d.id ? 3 : 2.5;
+      })
+      .attr('filter', (d) => {
+        const isHighlighted = highlightNodes.length > 0 
+          ? highlightNodes.includes(d.id)
+          : internalHighlightNodes.includes(d.id);
+        return isHighlighted || selectedNode === d.id ? 'url(#glow)' : 'none';
+      });
 
     nodeGroups
       .append('text')
@@ -226,7 +259,7 @@ export default function GraphVisualizer({
       .attr('font-weight', 'bold')
       .attr('text-shadow', '0 1px 2px rgba(0,0,0,0.3)')
       .text((d) => d.label);
-  }, [nodes, edges, highlightNodes, highlightEdges, selectedNode, onNodeClick]);
+  }, [nodes, edges, highlightNodes, highlightEdges, selectedNode, onNodeClick, internalHighlightNodes, highlightEdgesForDelete]);
 
   const addNode = () => {
     const newId = String.fromCharCode(65 + nodes.length);
@@ -251,13 +284,12 @@ export default function GraphVisualizer({
     }
   };
 
-  const bfsTraversal = () => {
+  const bfsTraversal = async (startNodeId?: string) => {
     if (nodes.length === 0) return;
-    const startNode = nodes[0].id;
+    const startNode = startNodeId || nodes[0].id;
     const visited = new Set<string>();
     const queue = [startNode];
     const traversal: string[] = [];
-    const highlighted: string[] = [];
 
     // Build adjacency list
     const adjList: Record<string, string[]> = {};
@@ -269,42 +301,314 @@ export default function GraphVisualizer({
       adjList[edge.target].push(edge.source);
     });
 
-    const animate = () => {
-      if (queue.length === 0) return;
-
+    while (queue.length > 0) {
       const current = queue.shift()!;
-      if (visited.has(current)) {
-        animate();
-        return;
-      }
+      if (visited.has(current)) continue;
 
       visited.add(current);
       traversal.push(current);
-      highlighted.push(current);
+      setInternalHighlightNodes([...traversal]);
+      await new Promise((resolve) => setTimeout(resolve, 600));
 
-      // Update highlight
-      setTimeout(() => {
-        // Highlight logic would go here
-      }, 500);
-
-      adjList[current].forEach((neighbor) => {
+      adjList[current]?.forEach((neighbor) => {
         if (!visited.has(neighbor) && !queue.includes(neighbor)) {
           queue.push(neighbor);
         }
       });
+    }
 
-      if (queue.length > 0) {
-        setTimeout(animate, 500);
+    setOperationResult({
+      success: true,
+      message: `✅ BFS Traversal complete! Order: ${traversal.join(' → ')}`
+    });
+  };
+
+  const dfsTraversal = async (startNodeId?: string) => {
+    if (nodes.length === 0) return;
+    const startNode = startNodeId || nodes[0].id;
+    const visited = new Set<string>();
+    const traversal: string[] = [];
+
+    // Build adjacency list
+    const adjList: Record<string, string[]> = {};
+    nodes.forEach((node) => {
+      adjList[node.id] = [];
+    });
+    edges.forEach((edge) => {
+      adjList[edge.source].push(edge.target);
+      adjList[edge.target].push(edge.source);
+    });
+
+    const dfsRecursive = async (nodeId: string): Promise<void> => {
+      if (visited.has(nodeId)) return;
+
+      visited.add(nodeId);
+      traversal.push(nodeId);
+      setInternalHighlightNodes([...traversal]);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      for (const neighbor of adjList[nodeId] || []) {
+        if (!visited.has(neighbor)) {
+          await dfsRecursive(neighbor);
+        }
       }
     };
 
-    animate();
+    await dfsRecursive(startNode);
+    setOperationResult({
+      success: true,
+      message: `✅ DFS Traversal complete! Order: ${traversal.join(' → ')}`
+    });
   };
 
   const clearGraph = () => {
     setNodes([]);
     setEdges([]);
     setSelectedNode(null);
+    setSearchResult(null);
+    setInternalHighlightNodes([]);
+  };
+
+  const deleteNode = async (nodeId: string) => {
+    setOperationResult(null);
+    setSearchResult(null);
+    
+    // Check if node exists
+    const nodeExists = nodes.some(n => n.id === nodeId);
+    if (!nodeExists) {
+      setOperationResult({
+        success: false,
+        message: `❌ Node ${nodeId} not found in graph.`
+      });
+      return;
+    }
+
+    // Highlight the node to be deleted
+    setInternalHighlightNodes([nodeId]);
+    
+    // Find and highlight all edges connected to this node
+    const connectedEdges = edges.filter(
+      e => e.source === nodeId || e.target === nodeId
+    );
+    setHighlightEdgesForDelete(connectedEdges);
+    
+    // Show animation
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Count edges that will be deleted
+    const edgeCount = connectedEdges.length;
+    
+    // Perform deletion
+    const newNodes = nodes.filter(n => n.id !== nodeId);
+    const newEdges = edges.filter(e => e.source !== nodeId && e.target !== nodeId);
+    
+    setNodes(newNodes);
+    setEdges(newEdges);
+    
+    if (selectedNode === nodeId) {
+      setSelectedNode(null);
+    }
+    
+    setInternalHighlightNodes([]);
+    setHighlightEdgesForDelete([]);
+    
+    setOperationResult({
+      success: true,
+      message: `✅ Node ${nodeId} deleted successfully! Removed ${edgeCount} connected edge${edgeCount !== 1 ? 's' : ''}.`
+    });
+  };
+
+  const searchInGraph = async (targetId: string, useDFS: boolean = false) => {
+    setSearchResult(null);
+    setOperationResult(null);
+    setInternalHighlightNodes([]);
+
+    if (nodes.length === 0) {
+      setOperationResult({
+        success: false,
+        message: '❌ Graph is empty'
+      });
+      return;
+    }
+
+    // Build adjacency list
+    const adjList: Record<string, string[]> = {};
+    nodes.forEach((node) => {
+      adjList[node.id] = [];
+    });
+    edges.forEach((edge) => {
+      adjList[edge.source].push(edge.target);
+      adjList[edge.target].push(edge.source);
+    });
+
+    if (useDFS) {
+      // DFS search
+      const visited = new Set<string>();
+      const path: string[] = [];
+      let found = false;
+      const parent: Record<string, string | null> = {};
+      parent[nodes[0].id] = null;
+
+      const dfsSearch = async (current: string): Promise<boolean> => {
+        if (visited.has(current)) return false;
+        
+        visited.add(current);
+        path.push(current);
+        setInternalHighlightNodes([...path]);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        if (current === targetId) {
+          found = true;
+          const fullPath: string[] = [];
+          let node: string | null = current;
+          while (node) {
+            fullPath.unshift(node);
+            node = parent[node] || null;
+          }
+          setOperationResult({
+            success: true,
+            message: `✅ Found ${targetId} using DFS! Path: ${fullPath.join(' → ')}`
+          });
+          return true;
+        }
+
+        for (const neighbor of adjList[current] || []) {
+          if (!visited.has(neighbor)) {
+            parent[neighbor] = current;
+            if (await dfsSearch(neighbor)) return true;
+          }
+        }
+        return false;
+      };
+
+      await dfsSearch(nodes[0].id);
+      if (!found) {
+        setOperationResult({
+          success: false,
+          message: `❌ ${targetId} not found using DFS. Visited: ${path.join(', ')}`
+        });
+      }
+    } else {
+      // BFS search
+      const visited = new Set<string>();
+      const queue: string[] = [nodes[0].id];
+      const path: string[] = [];
+      let found = false;
+      const parent: Record<string, string | null> = {};
+      parent[nodes[0].id] = null;
+
+      while (queue.length > 0) {
+        const current = queue.shift()!;
+        
+        if (visited.has(current)) continue;
+        visited.add(current);
+        path.push(current);
+        setInternalHighlightNodes([...path]);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        if (current === targetId) {
+          found = true;
+          const fullPath: string[] = [];
+          let node: string | null = current;
+          while (node) {
+            fullPath.unshift(node);
+            node = parent[node] || null;
+          }
+          setOperationResult({
+            success: true,
+            message: `✅ Found ${targetId} using BFS! Path: ${fullPath.join(' → ')}`
+          });
+          break;
+        }
+
+        adjList[current]?.forEach((neighbor) => {
+          if (!visited.has(neighbor) && !queue.includes(neighbor)) {
+            parent[neighbor] = current;
+            queue.push(neighbor);
+          }
+        });
+      }
+
+      if (!found) {
+        setOperationResult({
+          success: false,
+          message: `❌ ${targetId} not found using BFS. Visited: ${path.join(', ')}`
+        });
+      }
+    }
+  };
+
+  const runOperation = async () => {
+    if (!inputValue.trim() && operation !== 'traverse') return;
+    
+    setIsRunning(true);
+    setInternalHighlightNodes([]);
+    setOperationResult(null);
+    setSearchResult(null);
+    setHighlightEdgesForDelete([]);
+
+    try {
+      if (operation === 'add') {
+        const newId = inputValue.toUpperCase().trim();
+        if (!newId) {
+          setOperationResult({
+            success: false,
+            message: '❌ Please enter a node ID'
+          });
+          return;
+        }
+        if (nodes.some(n => n.id === newId)) {
+          setOperationResult({
+            success: false,
+            message: `❌ Node ${newId} already exists!`
+          });
+        } else {
+          const newNode: GraphNode = {
+            id: newId,
+            x: Math.random() * 600 + 100,
+            y: Math.random() * 300 + 50,
+            label: newId,
+          };
+          setNodes([...nodes, newNode]);
+          setInternalHighlightNodes([newId]);
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          setOperationResult({
+            success: true,
+            message: `✅ Node ${newId} added successfully!`
+          });
+          setInternalHighlightNodes([]);
+        }
+      } else if (operation === 'delete') {
+        if (!inputValue.trim()) {
+          setOperationResult({
+            success: false,
+            message: '❌ Please enter a node ID to delete'
+          });
+          return;
+        }
+        await deleteNode(inputValue.toUpperCase().trim());
+      } else if (operation === 'search') {
+        if (!inputValue.trim()) {
+          setOperationResult({
+            success: false,
+            message: '❌ Please enter a node ID to search'
+          });
+          return;
+        }
+        await searchInGraph(inputValue.toUpperCase().trim(), algorithm === 'dfs');
+      } else if (operation === 'traverse') {
+        if (algorithm === 'bfs') {
+          await bfsTraversal();
+        } else {
+          await dfsTraversal();
+        }
+      }
+    } finally {
+      setIsRunning(false);
+      if (operation !== 'traverse') {
+        setInputValue('');
+      }
+    }
   };
 
   const generateRandomGraph = () => {
@@ -350,25 +654,58 @@ export default function GraphVisualizer({
       <div className="mb-6">
         <h3 className="text-2xl font-bold mb-4 gradient-text">Graph Visualization</h3>
         <div className="flex flex-wrap gap-3 items-center mb-4">
-          <button
-            onClick={addNode}
-            className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+          <select
+            value={operation}
+            onChange={(e) => setOperation(e.target.value as 'add' | 'delete' | 'search' | 'traverse')}
+            className="px-4 py-2 glass-card border border-indigo-200 dark:border-indigo-800 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white/50 dark:bg-gray-800/50 text-gray-900 dark:text-white"
           >
-            Add Node
+            <option value="add">Add Node</option>
+            <option value="delete">Delete Node</option>
+            <option value="search">Search Node</option>
+            <option value="traverse">Traverse Graph</option>
+          </select>
+          
+          {(operation === 'search' || operation === 'traverse') && (
+            <select
+              value={algorithm}
+              onChange={(e) => setAlgorithm(e.target.value as 'bfs' | 'dfs')}
+              className="px-4 py-2 glass-card border border-indigo-200 dark:border-indigo-800 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white/50 dark:bg-gray-800/50 text-gray-900 dark:text-white"
+            >
+              <option value="bfs">BFS</option>
+              <option value="dfs">DFS</option>
+            </select>
+          )}
+
+          {operation !== 'traverse' && (
+            <input
+              type="text"
+              placeholder={operation === 'add' ? 'Node ID to add' : operation === 'delete' ? 'Node ID to delete' : 'Node ID to search'}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value.toUpperCase())}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !isRunning) {
+                  runOperation();
+                }
+              }}
+              className="px-4 py-2 glass-card border border-indigo-200 dark:border-indigo-800 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white/50 dark:bg-gray-800/50 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 w-40"
+              disabled={isRunning}
+            />
+          )}
+
+          <button
+            onClick={runOperation}
+            disabled={isRunning || (operation !== 'traverse' && !inputValue.trim()) || nodes.length === 0}
+            className="px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+          >
+            {isRunning ? 'Running...' : '▶ Run'}
           </button>
+
           <button
             onClick={addEdge}
             disabled={nodes.length < 2}
             className="px-5 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
           >
             Add Edge
-          </button>
-          <button
-            onClick={bfsTraversal}
-            disabled={nodes.length === 0}
-            className="px-5 py-2 bg-gradient-to-r from-yellow-600 to-amber-600 text-white rounded-lg hover:from-yellow-700 hover:to-amber-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-          >
-            BFS Traversal
           </button>
           <button
             onClick={generateRandomGraph}
@@ -383,6 +720,21 @@ export default function GraphVisualizer({
             Clear
           </button>
         </div>
+        {operationResult && (
+          <div className={`mb-4 p-4 rounded-lg ${
+            operationResult.success 
+              ? 'bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700' 
+              : 'bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700'
+          }`}>
+            <p className={`font-semibold ${
+              operationResult.success 
+                ? 'text-green-800 dark:text-green-200' 
+                : 'text-red-800 dark:text-red-200'
+            }`}>
+              {operationResult.message}
+            </p>
+          </div>
+        )}
         <p className="text-sm text-gray-600 dark:text-gray-400">
           Click and drag nodes to move them. Click a node to select it.
         </p>
